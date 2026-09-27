@@ -1,5 +1,6 @@
 import Dependencies
 import Foundation
+import Dependencies
 
 public struct SpanID: Sendable, Hashable {
 	public let rawValue: UUID
@@ -15,6 +16,8 @@ public struct SpanID: Sendable, Hashable {
 
 public struct Span: Identifiable {
 	@TaskLocal public static var current: Span.ID?
+	
+	@Dependency(\.date) private var date
 
 	public let id: SpanID
 	public let parent: Span.ID?
@@ -24,6 +27,8 @@ public struct Span: Identifiable {
 	public let file: StaticString
 	public let line: Int
 	public var attributes: [String: Any]
+	public var startedAt: Date?
+	public var finishedAt: Date?
 
 	public let middleware: [any SpanMiddleware]
 
@@ -95,6 +100,7 @@ public struct Span: Identifiable {
 			assertionFailure("Span started started more than once.")
 
 		case .pending:
+			self.startedAt = date.now
 			self.state = .started
 
 			for middleware in middleware {
@@ -112,6 +118,7 @@ public struct Span: Identifiable {
 			assertionFailure("Span finished more than once.")
 
 		case .started:
+			self.finishedAt = date.now
 			self.state = .finished
 
 			for middleware in middleware {
@@ -129,6 +136,7 @@ public struct Span: Identifiable {
 			assertionFailure("Span finished more than once.")
 
 		case .started:
+			self.finishedAt = date.now
 			self.state = .failed(error)
 
 			for middleware in middleware {
@@ -160,6 +168,9 @@ public struct Span: Identifiable {
 			assertionFailure("Span started started more than once.")
 
 		case .pending:
+			self.startedAt = date.now
+			self.finishedAt = self.startedAt
+			
 			self.state = .finished
 
 			for middleware in middleware {
