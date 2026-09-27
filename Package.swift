@@ -7,7 +7,7 @@ let package = Package(
 	name: "Trace",
 	platforms: [
 		.iOS(.v26),
-		.macOS(.v15),
+		.macOS(.v26),
 	],
 	products: [
 		.library(name: "Trace", targets: ["Trace"]),
