@@ -13,6 +13,7 @@ let package = Package(
 		.library(name: "Trace", targets: ["Trace"]),
 	],
 	dependencies: [
+		.package(url: "https://github.com/groue/GRDB.swift", from: "7.0.0"),
 		.package(url: "https://github.com/pointfreeco/swift-custom-dump", from: "1.0.0"),
 		.package(url: "https://github.com/pointfreeco/swift-dependencies.git", from: "1.9.3"),
 		.package(url: "https://github.com/pointfreeco/swift-macro-testing", from: "0.6.3"),
@@ -23,6 +24,7 @@ let package = Package(
 		.target(
 			name: "Trace",
 			dependencies: [
+				.product(name: "GRDB", package: "GRDB.swift"),
 				.product(name: "CustomDump", package: "swift-custom-dump"),
 				.product(name: "Dependencies", package: "swift-dependencies"),
 				.product(name: "IssueReporting", package: "xctest-dynamic-overlay"),
@@ -54,6 +56,7 @@ let package = Package(
 			name: "TraceTests",
 			dependencies: [
 				"Trace",
+				.product(name: "GRDB", package: "GRDB.swift"),
 			],
 			swiftSettings: [
 				.enableExperimentalFeature("BodyMacros"),
