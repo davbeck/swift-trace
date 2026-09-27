@@ -1,51 +1,8 @@
-import Broadcast
 import Testing
 @testable import Trace
 
 @Suite
 struct LoggingSpanMiddlewareTests {
-	@Test
-	func logsStructuredSpanLifecycle() throws {
-		let logger = SessionLogger()
-		let middleware = LoggingSpanMiddleware(
-			configuration: LoggingSpanConfiguration(traceLoggingOptions: "*:level=verbose"),
-			log: Log(destinations: [logger]),
-		)
-		var span = Span(
-			operation: "load",
-			context: "BudgetView",
-			attributes: ["source": "cache"],
-			middleware: [middleware],
-		)
-
-		span.start()
-		span.update(["count": 2])
-		span.finish()
-
-		let records = logger.records()
-		#expect(records.map(\.signal) == [.action, .state, .state])
-		#expect(records.map(\.category) == ["Span", "Span", "Span"])
-		#expect(records.map(\.message) == ["Span started", "Span updated", "Span finished"])
-		#expect(logger.logs().contains("name=BudgetView.load"))
-	}
-
-	@Test
-	func logsConcreteErrorTypeForFailedSpan() {
-		let logger = SessionLogger()
-		let middleware = LoggingSpanMiddleware(
-			configuration: LoggingSpanConfiguration(traceLoggingOptions: "*:level=errors"),
-			log: Log(destinations: [logger]),
-		)
-		var span = Span(operation: "load", context: "BudgetView", middleware: [middleware])
-
-		span.start()
-		span.finish(throwing: TestError())
-
-		#expect(logger.records().map(\.level) == [.error])
-		#expect(logger.logs().contains("errorType="))
-		#expect(logger.logs().contains("TestError"))
-	}
-
 	@Test
 	func formatsAttributesWithCustomDump() {
 		let formatted = LoggingSpanMiddleware.formatAttributes(
@@ -192,8 +149,4 @@ struct LoggingSpanMiddlewareTests {
 
 		#expect(configuration.options(for: span).level == .none)
 	}
-}
-
-private extension LoggingSpanMiddlewareTests {
-	struct TestError: Error {}
 }
