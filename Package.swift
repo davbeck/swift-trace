@@ -19,7 +19,7 @@ let package = Package(
 		.package(url: "https://github.com/pointfreeco/swift-custom-dump", from: "1.0.0"),
 		.package(url: "https://github.com/pointfreeco/swift-dependencies.git", from: "1.9.3"),
 		.package(url: "https://github.com/pointfreeco/swift-macro-testing", from: "0.6.3"),
-		.package(url: "https://github.com/pointfreeco/xctest-dynamic-overlay", from: "1.10.1"),
+		.package(url: "https://github.com/pointfreeco/swift-issue-reporting", from: "1.10.1"),
 		.package(url: "https://github.com/swiftlang/swift-syntax", from: "602.0.0"),
 	],
 	targets: [
@@ -29,7 +29,7 @@ let package = Package(
 				.product(name: "GRDB", package: "GRDB.swift"),
 				.product(name: "CustomDump", package: "swift-custom-dump"),
 				.product(name: "Dependencies", package: "swift-dependencies"),
-				.product(name: "IssueReporting", package: "xctest-dynamic-overlay"),
+				.product(name: "IssueReporting", package: "swift-issue-reporting"),
 				"TraceMacros",
 			],
 			swiftSettings: [
@@ -43,7 +43,7 @@ let package = Package(
 			dependencies: [
 				"Trace",
 				.product(name: "Dependencies", package: "swift-dependencies"),
-				.product(name: "IssueReporting", package: "xctest-dynamic-overlay"),
+				.product(name: "IssueReporting", package: "swift-issue-reporting"),
 				.product(name: "Sentry", package: "sentry-cocoa"),
 			],
 		),
