@@ -39,7 +39,12 @@ public struct LoggingSpanMiddleware: SpanMiddleware {
 		case .finished:
 			guard options.level.logsSuccessfulFinish else { return }
 
-			logger.debug("\(span.id.logDescription) \(span.name) finished")
+			if span.startedAt == span.finishedAt {
+				let details = span.description.map { " \($0)" } ?? ""
+				logger.debug("\(span.id.logDescription) \(span.name) event\(details) \(Self.formatAttributes(span.attributes, maximumDepth: options.depth, maximumBytes: options.maxBytes))")
+			} else {
+				logger.debug("\(span.id.logDescription) \(span.name) finished")
+			}
 		case let .failed(error):
 			guard options.level.logsFailedFinish else { return }
 
