@@ -62,7 +62,7 @@ public struct SQLiteSpanMiddleware: SpanMiddleware {
 		write(span, finished: true)
 	}
 
-	public func spanAttributesUpdated(_ span: Span, updatedAttributes: [String: Any]) {
+	public func spanAttributesUpdated(_ span: Span, updatedAttributes: [String: any Sendable]) {
 		guard case .started = span.state else { return }
 		do {
 			try database.write { db in

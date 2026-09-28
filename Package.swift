@@ -11,8 +11,10 @@ let package = Package(
 	],
 	products: [
 		.library(name: "Trace", targets: ["Trace"]),
+		.library(name: "TraceSentry", targets: ["TraceSentry"]),
 	],
 	dependencies: [
+		.package(url: "https://github.com/getsentry/sentry-cocoa", from: "9.0.0"),
 		.package(url: "https://github.com/groue/GRDB.swift", from: "7.0.0"),
 		.package(url: "https://github.com/pointfreeco/swift-custom-dump", from: "1.0.0"),
 		.package(url: "https://github.com/pointfreeco/swift-dependencies.git", from: "1.9.3"),
@@ -34,6 +36,15 @@ let package = Package(
 				.enableExperimentalFeature("BodyMacros"),
 				.enableUpcomingFeature("NonisolatedNonsendingByDefault"),
 				.enableUpcomingFeature("InferIsolatedConformances"),
+			],
+		),
+		.target(
+			name: "TraceSentry",
+			dependencies: [
+				"Trace",
+				.product(name: "Dependencies", package: "swift-dependencies"),
+				.product(name: "IssueReporting", package: "xctest-dynamic-overlay"),
+				.product(name: "Sentry", package: "sentry-cocoa"),
 			],
 		),
 		.macro(
@@ -62,6 +73,15 @@ let package = Package(
 				.enableExperimentalFeature("BodyMacros"),
 				.enableUpcomingFeature("NonisolatedNonsendingByDefault"),
 				.enableUpcomingFeature("InferIsolatedConformances"),
+			],
+		),
+		.testTarget(
+			name: "TraceSentryTests",
+			dependencies: [
+				"Trace",
+				"TraceSentry",
+				.product(name: "Dependencies", package: "swift-dependencies"),
+				.product(name: "Sentry", package: "sentry-cocoa"),
 			],
 		),
 		.testTarget(

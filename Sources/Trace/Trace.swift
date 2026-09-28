@@ -8,7 +8,7 @@ public enum Trace {
 		description: String? = nil,
 		file: StaticString = #file,
 		line: Int = #line,
-		attributes: [String: Any] = [:],
+		attributes: [String: any Sendable] = [:],
 		_ work: (inout Span) async throws -> R,
 	) async rethrows -> R {
 		var span = Span(
@@ -42,7 +42,7 @@ public enum Trace {
 		description: String? = nil,
 		file: StaticString = #file,
 		line: Int = #line,
-		attributes: [String: Any] = [:],
+		attributes: [String: any Sendable] = [:],
 		_ work: (inout Span) throws -> R,
 	) rethrows -> R {
 		var span = Span(
@@ -74,10 +74,10 @@ public enum Trace {
 	public func event(
 		operation: String = #function,
 		context: String? = nil,
-		description: String? = nil,
+		_ description: String? = nil,
 		file: StaticString = #file,
 		line: Int = #line,
-		attributes: [String: Any] = [:],
+		attributes: [String: any Sendable] = [:],
 	) {
 		var span = Span(
 			operation: operation,

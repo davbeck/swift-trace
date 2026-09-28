@@ -45,7 +45,7 @@ struct SQLiteSpanMiddlewareTests {
 				"text": "hello",
 				"enabled": true,
 				"nothing": NSNull(),
-				"nested": ["values": [1, identifier, Double.infinity]],
+				"nested": ["values": [1, identifier, Double.infinity] as [any Sendable]],
 			], middleware: [middleware])
 			span.start()
 

@@ -47,7 +47,7 @@ public struct LoggingSpanMiddleware: SpanMiddleware {
 		}
 	}
 
-	public func spanAttributesUpdated(_ span: Span, updatedAttributes: [String: Any]) {
+	public func spanAttributesUpdated(_ span: Span, updatedAttributes: [String: any Sendable]) {
 		let options = configuration.options(for: span)
 		guard options.level == .verbose else { return }
 

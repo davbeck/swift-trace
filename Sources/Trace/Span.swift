@@ -14,7 +14,7 @@ public struct SpanID: Sendable, Hashable {
 	}
 }
 
-public struct Span: Identifiable {
+public struct Span: Identifiable, Sendable {
 	@TaskLocal public static var current: Span.ID?
 	
 	@Dependency(\.date) private var date
@@ -26,7 +26,7 @@ public struct Span: Identifiable {
 	public let description: String?
 	public let file: StaticString
 	public let line: Int
-	public var attributes: [String: Any]
+	public var attributes: [String: any Sendable]
 	public var startedAt: Date?
 	public var finishedAt: Date?
 
@@ -56,7 +56,7 @@ public struct Span: Identifiable {
 		description: String? = nil,
 		file: StaticString = #file,
 		line: Int = #line,
-		attributes: [String: Any] = [:],
+		attributes: [String: any Sendable] = [:],
 	) {
 		@Dependency(\.spanMiddleware) var middleware
 
@@ -79,7 +79,7 @@ public struct Span: Identifiable {
 		description: String? = nil,
 		file: StaticString = #file,
 		line: Int = #line,
-		attributes: [String: Any] = [:],
+		attributes: [String: any Sendable] = [:],
 		middleware: [any SpanMiddleware],
 	) {
 		self.id = SpanID()
@@ -145,7 +145,7 @@ public struct Span: Identifiable {
 		}
 	}
 
-	public mutating func update(_ attributes: [String: Any]) {
+	public mutating func update(_ attributes: [String: any Sendable]) {
 		switch self.state {
 		case .finished, .failed:
 			assertionFailure("Span updated after being finished.")

@@ -3,7 +3,7 @@ import Dependencies
 public protocol SpanMiddleware: Sendable {
 	func spanStarted(_ span: Span)
 	func spanFinished(_ span: Span)
-	func spanAttributesUpdated(_ span: Span, updatedAttributes: [String: Any])
+	func spanAttributesUpdated(_ span: Span, updatedAttributes: [String: any Sendable])
 }
 
 enum SpanMiddlewareDependencyKey: DependencyKey {
