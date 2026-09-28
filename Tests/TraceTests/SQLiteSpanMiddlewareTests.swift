@@ -10,11 +10,11 @@ struct SQLiteSpanMiddlewareTests {
 	func persistsLifecycleAttributesAndParent() throws {
 		try withTestDate {
 			let url = temporaryDatabaseURL()
-			let middleware = try SQLiteSpanMiddleware(databaseURL: url)
+			let database = try databaseQueue(at: url)
+			let middleware = try SQLiteSpanMiddleware(database)
 			var parent = Span(operation: "parent", attributes: ["initial": 1], middleware: [middleware])
 			parent.start()
 
-			let database = try DatabaseQueue(path: url.path)
 			let started = try row(for: parent, in: database)
 			#expect(started?["status"] == "started")
 			#expect(started?["finished_at"] as Double? == nil)
@@ -39,7 +39,8 @@ struct SQLiteSpanMiddlewareTests {
 	func convertsUnsupportedValuesToStringsWithinJSON() throws {
 		try withTestDate {
 			let url = temporaryDatabaseURL()
-			let middleware = try SQLiteSpanMiddleware(databaseURL: url)
+			let database = try databaseQueue(at: url)
+			let middleware = try SQLiteSpanMiddleware(database)
 			let identifier = UUID()
 			var span = Span(operation: "json", attributes: [
 				"text": "hello",
@@ -49,7 +50,6 @@ struct SQLiteSpanMiddlewareTests {
 			], middleware: [middleware])
 			span.start()
 
-			let database = try DatabaseQueue(path: url.path)
 			let storedAttributes = try attributes(for: span, in: database)
 			let attributes = try #require(storedAttributes)
 			#expect(attributes["text"] as? String == "hello")
@@ -100,7 +100,7 @@ struct SQLiteSpanMiddlewareTests {
 				""")
 		}
 
-		_ = try SQLiteSpanMiddleware(databaseURL: url)
+		_ = try SQLiteSpanMiddleware(database)
 		let migrated = try database.read { db in
 			try String.fetchOne(db, sql: "SELECT attributes FROM spans WHERE id = 'old'")
 		}
@@ -118,19 +118,21 @@ struct SQLiteSpanMiddlewareTests {
 	func marksUnfinishedSpansFailedWhenReopened() throws {
 		try withTestDate {
 			let url = temporaryDatabaseURL()
-			let middleware = try SQLiteSpanMiddleware(databaseURL: url)
+			let database = try databaseQueue(at: url)
+			let middleware = try SQLiteSpanMiddleware(database)
 			var unfinished = Span(operation: "unfinished", middleware: [middleware])
 			unfinished.start()
 			var completed = Span(operation: "completed", middleware: [middleware])
 			completed.start()
 			completed.finish()
 
-			_ = try SQLiteSpanMiddleware(databaseURL: url)
-			let database = try DatabaseQueue(path: url.path)
-			let recovered = try row(for: unfinished, in: database)
+			try database.read { _ in }
+			let reopenedDatabase = try databaseQueue(at: url)
+			_ = try SQLiteSpanMiddleware(reopenedDatabase)
+			let recovered = try row(for: unfinished, in: reopenedDatabase)
 			#expect(recovered?["status"] == "failed")
 			#expect((recovered?["error"] as String?) == "Interrupted before completion")
-			#expect(try row(for: completed, in: database)?["status"] == "finished")
+			#expect(try row(for: completed, in: reopenedDatabase)?["status"] == "finished")
 		}
 	}
 
@@ -138,14 +140,14 @@ struct SQLiteSpanMiddlewareTests {
 	func persistsFailedSpansAndEvents() throws {
 		try withTestDate {
 			let url = temporaryDatabaseURL()
-			let middleware = try SQLiteSpanMiddleware(databaseURL: url)
+			let database = try databaseQueue(at: url)
+			let middleware = try SQLiteSpanMiddleware(database)
 			var failed = Span(operation: "failed", middleware: [middleware])
 			failed.start()
 			failed.finish(throwing: TestError.example)
 			var event = Span(operation: "event", middleware: [middleware])
 			event.trigger()
 
-			let database = try DatabaseQueue(path: url.path)
 			#expect(try row(for: failed, in: database)?["status"] == "failed")
 			#expect((try row(for: failed, in: database)?["error"] as String?)?.contains("example") == true)
 			let eventRow = try row(for: event, in: database)
@@ -167,6 +169,14 @@ struct SQLiteSpanMiddlewareTests {
 	private func temporaryDatabaseURL() -> URL {
 		FileManager.default.temporaryDirectory
 			.appending(path: "TraceTests-\(UUID().uuidString)/spans.sqlite")
+	}
+
+	private func databaseQueue(at url: URL) throws -> DatabaseQueue {
+		try FileManager.default.createDirectory(
+			at: url.deletingLastPathComponent(),
+			withIntermediateDirectories: true
+		)
+		return try DatabaseQueue(path: url.path)
 	}
 
 	private func row(for span: Span, in database: DatabaseQueue) throws -> Row? {

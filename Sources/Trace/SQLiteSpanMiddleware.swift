@@ -2,15 +2,14 @@ import Foundation
 import GRDB
 import IssueReporting
 
-/// Persists spans synchronously so a crash leaves a record of work in progress.
+/// Persists spans on a serial database queue.
 public struct SQLiteSpanMiddleware: SpanMiddleware {
 	public static var defaultDatabaseURL: URL {
 		FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
 			.appending(path: "Trace/spans.sqlite")
 	}
 
-	public let databaseURL: URL
-	private let database: DatabaseQueue
+	public let database: DatabaseQueue
 
 	public init(databaseURL: URL = Self.defaultDatabaseURL) throws {
 		try FileManager.default.createDirectory(
@@ -18,24 +17,31 @@ public struct SQLiteSpanMiddleware: SpanMiddleware {
 			withIntermediateDirectories: true
 		)
 		let database = try DatabaseQueue(path: databaseURL.path)
+
+		try self.init(database)
+	}
+
+	public init(_ database: DatabaseQueue) throws {
+		self.database = database
+
 		var migrator = DatabaseMigrator()
 		migrator.registerMigration("createSpans") { db in
 			try db.execute(sql: """
-				CREATE TABLE spans (
-				    id TEXT PRIMARY KEY NOT NULL,
-				    parent_id TEXT REFERENCES spans(id),
-				    operation TEXT NOT NULL,
-				    context TEXT,
-				    description TEXT,
-				    file TEXT NOT NULL,
-				    line INTEGER NOT NULL,
-				    attributes TEXT NOT NULL,
-				    started_at REAL NOT NULL,
-				    finished_at REAL,
-				    status TEXT NOT NULL,
-				    error TEXT
-				)
-				""")
+			CREATE TABLE spans (
+				id TEXT PRIMARY KEY NOT NULL,
+				parent_id TEXT REFERENCES spans(id),
+				operation TEXT NOT NULL,
+				context TEXT,
+				description TEXT,
+				file TEXT NOT NULL,
+				line INTEGER NOT NULL,
+				attributes TEXT NOT NULL,
+				started_at REAL NOT NULL,
+				finished_at REAL,
+				status TEXT NOT NULL,
+				error TEXT
+			)
+			""")
 			try db.execute(sql: "CREATE INDEX spans_parent_id ON spans(parent_id)")
 		}
 		migrator.registerMigration("storeAttributesAsJSON") { db in
@@ -44,14 +50,20 @@ public struct SQLiteSpanMiddleware: SpanMiddleware {
 			try db.execute(sql: "ALTER TABLE spans DROP COLUMN attributes")
 			try db.execute(sql: "ALTER TABLE spans RENAME COLUMN attributes_json TO attributes")
 		}
-		try migrator.migrate(database)
-		try database.write { db in
-			try db.execute(
-				sql: "UPDATE spans SET status = 'failed', error = 'Interrupted before completion' WHERE status = 'started'"
-			)
+		migrator.asyncMigrate(database) { result in
+			switch result {
+			case let .success(db):
+				do {
+					try db.execute(
+						sql: "UPDATE spans SET status = 'failed', error = 'Interrupted before completion' WHERE status = 'started'"
+					)
+				} catch {
+					reportIssue("Failed to recover unfinished spans in SQLite: \(error)")
+				}
+			case let .failure(error):
+				reportIssue("Failed to migrate SQLite spans database: \(error)")
+			}
 		}
-		self.databaseURL = databaseURL
-		self.database = database
 	}
 
 	public func spanStarted(_ span: Span) {
@@ -64,15 +76,15 @@ public struct SQLiteSpanMiddleware: SpanMiddleware {
 
 	public func spanAttributesUpdated(_ span: Span, updatedAttributes: [String: any Sendable]) {
 		guard case .started = span.state else { return }
-		do {
-			try database.write { db in
-				try db.execute(
-					sql: "UPDATE spans SET attributes = ? WHERE id = ?",
-					arguments: [try Self.jsonAttributes(span.attributes), span.id.rawValue.uuidString]
-				)
+		database.asyncWrite { db in
+			try db.execute(
+				sql: "UPDATE spans SET attributes = ? WHERE id = ?",
+				arguments: [Self.jsonAttributes(span.attributes), span.id.rawValue.uuidString]
+			)
+		} completion: { _, result in
+			if case let .failure(error) = result {
+				reportIssue("Failed to update span attributes in SQLite: \(error)")
 			}
-		} catch {
-			reportIssue("Failed to update span attributes in SQLite: \(error)")
 		}
 	}
 
@@ -83,38 +95,42 @@ public struct SQLiteSpanMiddleware: SpanMiddleware {
 		case .finished: ("finished", nil)
 		case let .failed(error): ("failed", String(describing: error))
 		}
-		do {
-			try database.write { db in
-				try db.execute(
-					sql: """
-						INSERT INTO spans (
-						    id, parent_id, operation, context, description, file, line,
-						    attributes, started_at, finished_at, status, error
-						) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-						ON CONFLICT(id) DO UPDATE SET
-						    attributes = excluded.attributes,
-						    finished_at = excluded.finished_at,
-						    status = excluded.status,
-						    error = excluded.error
-						""",
-					arguments: [
-						span.id.rawValue.uuidString,
-						span.parent?.rawValue.uuidString,
-						span.operation,
-						span.context,
-						span.description,
-						span.file.description,
-						span.line,
-						try Self.jsonAttributes(span.attributes),
-						span.startedAt?.timeIntervalSince1970,
-						span.finishedAt?.timeIntervalSince1970,
-						status,
-						errorDescription,
-					]
-					)
+
+		database.asyncWrite { db in
+			try db.execute(
+				sql: """
+				INSERT INTO spans (
+					id, parent_id, operation, context, description, file, line,
+					attributes, started_at, finished_at, status, error
+				) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+				ON CONFLICT(id) DO UPDATE SET
+					attributes = excluded.attributes,
+					finished_at = excluded.finished_at,
+					status = excluded.status,
+					error = excluded.error
+				""",
+				arguments: [
+					span.id.rawValue.uuidString,
+					span.parent?.rawValue.uuidString,
+					span.operation,
+					span.context,
+					span.description,
+					span.file.description,
+					span.line,
+					Self.jsonAttributes(span.attributes),
+					span.startedAt?.timeIntervalSince1970,
+					span.finishedAt?.timeIntervalSince1970,
+					status,
+					errorDescription,
+				]
+			)
+		} completion: { _, result in
+			switch result {
+			case let .failure(error):
+				reportIssue("Failed to \(finished ? "finish" : "start") span in SQLite: \(error)")
+			case .success:
+				break
 			}
-		} catch {
-			reportIssue("Failed to \(finished ? "finish" : "start") span in SQLite: \(error)")
 		}
 	}
 
