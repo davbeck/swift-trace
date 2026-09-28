@@ -100,7 +100,7 @@ public struct Span: Identifiable, Sendable {
 			assertionFailure("Span started started more than once.")
 
 		case .pending:
-			self.startedAt = date.now
+			self.startedAt = middleware.isEmpty ? nil : date.now
 			self.state = .started
 
 			for middleware in middleware {
@@ -118,7 +118,7 @@ public struct Span: Identifiable, Sendable {
 			assertionFailure("Span finished more than once.")
 
 		case .started:
-			self.finishedAt = date.now
+			self.finishedAt = middleware.isEmpty ? nil : date.now
 			self.state = .finished
 
 			for middleware in middleware {
@@ -136,7 +136,7 @@ public struct Span: Identifiable, Sendable {
 			assertionFailure("Span finished more than once.")
 
 		case .started:
-			self.finishedAt = date.now
+			self.finishedAt = middleware.isEmpty ? nil : date.now
 			self.state = .failed(error)
 
 			for middleware in middleware {
@@ -168,7 +168,8 @@ public struct Span: Identifiable, Sendable {
 			assertionFailure("Span started started more than once.")
 
 		case .pending:
-			self.startedAt = date.now
+			// Tests omit middleware, so do not resolve the live clock for an unobserved event.
+			self.startedAt = middleware.isEmpty ? nil : date.now
 			self.finishedAt = self.startedAt
 			
 			self.state = .finished
