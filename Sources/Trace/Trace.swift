@@ -2,7 +2,7 @@ import Dependencies
 import Foundation
 
 public enum Trace {
-	public nonisolated(nonsending) func withSpan<R>(
+	public nonisolated(nonsending) static func withSpan<R>(
 		operation: String = #function,
 		context: String? = nil,
 		description: String? = nil,
@@ -36,7 +36,7 @@ public enum Trace {
 		}
 	}
 	
-	public func withSpan<R>(
+	public static func withSpan<R>(
 		operation: String = #function,
 		context: String? = nil,
 		description: String? = nil,
@@ -71,7 +71,7 @@ public enum Trace {
 	}
 	
 	/// Trace an action without any duration.
-	public func event(
+	public static func event(
 		operation: String = #function,
 		context: String? = nil,
 		_ description: String? = nil,
