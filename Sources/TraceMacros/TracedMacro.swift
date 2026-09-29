@@ -29,7 +29,7 @@ public enum TracedMacro: BodyMacro {
 			operation: \(stringLiteral(operation)),
 			context: \(spanContext.map(stringLiteral) ?? "nil"),
 			attributes: \(attributes),
-		) { _ in
+		) { span in
 		\(indent(body.statements.trimmedDescription))
 		}
 		"""
