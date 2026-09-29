@@ -1,6 +1,5 @@
 import Dependencies
 import Foundation
-import Dependencies
 
 public struct SpanID: Sendable, Hashable {
 	public let rawValue: UUID
@@ -10,13 +9,13 @@ public struct SpanID: Sendable, Hashable {
 	}
 
 	public var logDescription: Substring {
-		rawValue.uuidString.prefix(8)
+		self.rawValue.uuidString.prefix(8)
 	}
 }
 
 public struct Span: Identifiable, Sendable {
 	@TaskLocal public static var current: Span.ID?
-	
+
 	@Dependency(\.date) private var date
 
 	public let id: SpanID
@@ -43,9 +42,9 @@ public struct Span: Identifiable, Sendable {
 
 	public var name: String {
 		if let context {
-			"\(context).\(operation)"
+			"\(context).\(self.operation)"
 		} else {
-			operation
+			self.operation
 		}
 	}
 
@@ -56,7 +55,7 @@ public struct Span: Identifiable, Sendable {
 		description: String? = nil,
 		file: StaticString = #file,
 		line: Int = #line,
-		attributes: [String: any Sendable] = [:],
+		attributes: [String: any Sendable] = [:]
 	) {
 		@Dependency(\.spanMiddleware) var middleware
 
@@ -68,7 +67,7 @@ public struct Span: Identifiable, Sendable {
 			file: file,
 			line: line,
 			attributes: attributes,
-			middleware: middleware,
+			middleware: middleware
 		)
 	}
 
@@ -80,7 +79,7 @@ public struct Span: Identifiable, Sendable {
 		file: StaticString = #file,
 		line: Int = #line,
 		attributes: [String: any Sendable] = [:],
-		middleware: [any SpanMiddleware],
+		middleware: [any SpanMiddleware]
 	) {
 		self.id = SpanID()
 		self.parent = parent
@@ -100,10 +99,10 @@ public struct Span: Identifiable, Sendable {
 			assertionFailure("Span started started more than once.")
 
 		case .pending:
-			self.startedAt = date.now
+			self.startedAt = self.date.now
 			self.state = .started
 
-			for middleware in middleware {
+			for middleware in self.middleware {
 				middleware.spanStarted(self)
 			}
 		}
@@ -118,10 +117,10 @@ public struct Span: Identifiable, Sendable {
 			assertionFailure("Span finished more than once.")
 
 		case .started:
-			self.finishedAt = date.now
+			self.finishedAt = self.date.now
 			self.state = .finished
 
-			for middleware in middleware {
+			for middleware in self.middleware {
 				middleware.spanFinished(self)
 			}
 		}
@@ -136,10 +135,10 @@ public struct Span: Identifiable, Sendable {
 			assertionFailure("Span finished more than once.")
 
 		case .started:
-			self.finishedAt = date.now
+			self.finishedAt = self.date.now
 			self.state = .failed(error)
 
-			for middleware in middleware {
+			for middleware in self.middleware {
 				middleware.spanFinished(self)
 			}
 		}
@@ -153,12 +152,12 @@ public struct Span: Identifiable, Sendable {
 		case .pending, .started:
 			self.attributes.merge(attributes, uniquingKeysWith: { _, new in new })
 
-			for middleware in middleware {
+			for middleware in self.middleware {
 				middleware.spanAttributesUpdated(self, updatedAttributes: attributes)
 			}
 		}
 	}
-	
+
 	/// A start and finish the span in a single action.
 	///
 	/// Use this for tracking events.
@@ -168,12 +167,32 @@ public struct Span: Identifiable, Sendable {
 			assertionFailure("Span started started more than once.")
 
 		case .pending:
-			self.startedAt = date.now
+			self.startedAt = self.date.now
 			self.finishedAt = self.startedAt
-			
+
 			self.state = .finished
 
-			for middleware in middleware {
+			for middleware in self.middleware {
+				middleware.spanFinished(self)
+			}
+		}
+	}
+
+	/// A start and finish the span in a single action.
+	///
+	/// Use this for tracking errors that don't have a defined start and end.
+	public mutating func fail(throwing error: Error) {
+		switch self.state {
+		case .started, .finished, .failed:
+			assertionFailure("Span started started more than once.")
+
+		case .pending:
+			self.startedAt = self.date.now
+			self.finishedAt = self.startedAt
+
+			self.state = .failed(error)
+
+			for middleware in self.middleware {
 				middleware.spanFinished(self)
 			}
 		}

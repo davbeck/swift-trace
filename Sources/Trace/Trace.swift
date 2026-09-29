@@ -9,7 +9,7 @@ public enum Trace {
 		file: StaticString = #file,
 		line: Int = #line,
 		attributes: [String: any Sendable] = [:],
-		_ work: (inout Span) async throws -> R,
+		_ work: (inout Span) async throws -> R
 	) async rethrows -> R {
 		var span = Span(
 			operation: operation,
@@ -17,13 +17,67 @@ public enum Trace {
 			description: description,
 			file: file,
 			line: line,
-			attributes: attributes,
+			attributes: attributes
 		)
 		span.start()
 		
 		do {
 			let result = try await Span.$current.withValue(span.id) {
 				try await work(&span)
+			}
+			
+			span.finish()
+			
+			return result
+		} catch {
+			span.finish(throwing: error)
+			
+			throw error
+		}
+	}
+	
+	public nonisolated(nonsending) static func withSpan<R>(
+		operation: String = #function,
+		context: String? = nil,
+		description: String? = nil,
+		file: StaticString = #file,
+		line: Int = #line,
+		attributes: [String: any Sendable] = [:],
+		_ work: () async throws -> R
+	) async rethrows -> R {
+		try await withSpan(
+			operation: operation,
+			context: context,
+			description: description,
+			file: file,
+			line: line,
+			attributes: attributes,
+			{ _ in try await work() }
+		)
+	}
+	
+	public static func withSpan<R>(
+		operation: String = #function,
+		context: String? = nil,
+		description: String? = nil,
+		file: StaticString = #file,
+		line: Int = #line,
+		attributes: [String: any Sendable] = [:],
+		_ work: (inout Span) throws -> R
+	) rethrows -> R {
+		var span = Span(
+			operation: operation,
+			context: context,
+			description: description,
+			file: file,
+			line: line,
+			attributes: attributes
+		)
+		span.start()
+		
+		do {
+			let result = try Span.$current.withValue(span.id) {
+				try work(&span)
 			}
 			
 			span.finish()
@@ -43,31 +97,17 @@ public enum Trace {
 		file: StaticString = #file,
 		line: Int = #line,
 		attributes: [String: any Sendable] = [:],
-		_ work: (inout Span) throws -> R,
+		_ work: () throws -> R
 	) rethrows -> R {
-		var span = Span(
+		try withSpan(
 			operation: operation,
 			context: context,
 			description: description,
 			file: file,
 			line: line,
 			attributes: attributes,
+			{ _ in try work() }
 		)
-		span.start()
-		
-		do {
-			let result = try Span.$current.withValue(span.id) {
-				try work(&span)
-			}
-			
-			span.finish()
-			
-			return result
-		} catch {
-			span.finish(throwing: error)
-			
-			throw error
-		}
 	}
 	
 	/// Trace an action without any duration.
@@ -77,7 +117,7 @@ public enum Trace {
 		_ description: String? = nil,
 		file: StaticString = #file,
 		line: Int = #line,
-		attributes: [String: any Sendable] = [:],
+		attributes: [String: any Sendable] = [:]
 	) {
 		var span = Span(
 			operation: operation,
@@ -85,8 +125,29 @@ public enum Trace {
 			description: description,
 			file: file,
 			line: line,
-			attributes: attributes,
+			attributes: attributes
 		)
 		span.trigger()
+	}
+	
+	/// Trace an error without any duration.
+	public static func report(
+		_ error: Error,
+		operation: String = #function,
+		context: String? = nil,
+		_ description: String? = nil,
+		file: StaticString = #file,
+		line: Int = #line,
+		attributes: [String: any Sendable] = [:]
+	) {
+		var span = Span(
+			operation: operation,
+			context: context,
+			description: description,
+			file: file,
+			line: line,
+			attributes: attributes
+		)
+		span.fail(throwing: error)
 	}
 }
