@@ -25,7 +25,7 @@ public enum TracedMacro: BodyMacro {
 		let prefix = effectPrefix(for: function)
 		let attributes = attributeDictionary(for: function.signature.parameterClause.parameters)
 		let source = """
-		return \(prefix)withSpan(
+		return \(prefix)Trace.withSpan(
 			operation: \(stringLiteral(operation)),
 			context: \(spanContext.map(stringLiteral) ?? "nil"),
 			attributes: \(attributes),

@@ -19,7 +19,7 @@
 				"""
 				struct Feature {
 					func load(id: Int, named name: String) async throws -> String {
-						return try await withSpan(
+						return try await Trace.withSpan(
 							operation: "load",
 							context: "Feature",
 							attributes: ["id": id as Any, "name": name as Any],
@@ -43,7 +43,7 @@
 			} expansion: {
 				"""
 				func ping() {
-					return withSpan(
+					return Trace.withSpan(
 						operation: "ping",
 						context: nil,
 						attributes: [:],
@@ -70,7 +70,7 @@
 				"""
 				struct Feature {
 					func load(id: Int) {
-						return withSpan(
+						return Trace.withSpan(
 							operation: "load",
 							context: "FeatureContext",
 							attributes: ["id": id as Any],
@@ -98,7 +98,7 @@
 				"""
 				struct Feature {
 					func load(id: Int) {
-						return withSpan(
+						return Trace.withSpan(
 							operation: "load",
 							context: "ExplicitContext",
 							attributes: ["id": id as Any],
