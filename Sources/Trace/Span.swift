@@ -22,6 +22,7 @@ public struct Span: Identifiable, Sendable {
 	public let parent: Span.ID?
 	public let operation: String
 	public let context: String?
+	/// An optional explanation of what the operation is doing.
 	public let description: String?
 	public let file: StaticString
 	public let line: Int
@@ -40,6 +41,7 @@ public struct Span: Identifiable, Sendable {
 
 	public private(set) var state: State
 
+	/// Context name-spaced operation name.
 	public var name: String {
 		if let context {
 			"\(context).\(self.operation)"
