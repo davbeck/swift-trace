@@ -33,6 +33,16 @@ public struct LoggingSpanMiddleware: SpanMiddleware {
 	public func spanFinished(_ span: Span) {
 		let options = configuration.options(for: span)
 
+		var details = "\(span.id.logDescription) \(span.name)"
+		if let description = span.description {
+			details.append(" (\(description))")
+		}
+		let attributes = Self.formatAttributes(
+			span.attributes,
+			maximumDepth: options.depth,
+			maximumBytes: options.maxBytes
+		)
+
 		switch span.state {
 		case .pending, .started:
 			assertionFailure("unexpected span state \(span.state)")
@@ -40,15 +50,14 @@ public struct LoggingSpanMiddleware: SpanMiddleware {
 			guard options.level.logsSuccessfulFinish else { return }
 
 			if span.startedAt == span.finishedAt {
-				let details = span.description.map { " \($0)" } ?? ""
-				logger.debug("\(span.id.logDescription) \(span.name) event\(details) \(Self.formatAttributes(span.attributes, maximumDepth: options.depth, maximumBytes: options.maxBytes))")
+				logger.debug("\(details) \(attributes)")
 			} else {
-				logger.debug("\(span.id.logDescription) \(span.name) finished")
+				logger.debug("\(details) finished \(attributes)")
 			}
 		case let .failed(error):
 			guard options.level.logsFailedFinish else { return }
 
-			logger.error("\(span.id.logDescription) \(span.name) failed: \(error)")
+			logger.error("\(details) failed: \(error), \(attributes)")
 		}
 	}
 
