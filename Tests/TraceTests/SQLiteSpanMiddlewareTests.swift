@@ -100,7 +100,9 @@ struct SQLiteSpanMiddlewareTests {
 				""")
 		}
 
-		_ = try SQLiteSpanMiddleware(database)
+		try withTestDate {
+			_ = try SQLiteSpanMiddleware(database)
+		}
 		let migrated = try database.read { db in
 			try String.fetchOne(db, sql: "SELECT attributes FROM spans WHERE id = 'old'")
 		}
@@ -133,6 +135,45 @@ struct SQLiteSpanMiddlewareTests {
 			#expect(recovered?["status"] == "failed")
 			#expect((recovered?["error"] as String?) == "Interrupted before completion")
 			#expect(try row(for: completed, in: reopenedDatabase)?["status"] == "finished")
+		}
+	}
+
+	@Test
+	func deletesSpansOlderThanRetentionPeriodWhenReopened() throws {
+		try withTestDate {
+			let url = temporaryDatabaseURL()
+			let database = try databaseQueue(at: url)
+			let middleware = try SQLiteSpanMiddleware(database, retentionPeriod: 100)
+			var oldParent = Span(operation: "old parent", middleware: [middleware])
+			oldParent.start()
+			var recentChild = Span(parent: oldParent.id, operation: "recent child", middleware: [middleware])
+			recentChild.start()
+			var boundary = Span(operation: "boundary", middleware: [middleware])
+			boundary.start()
+			boundary.finish()
+			var oldCompleted = Span(operation: "old completed", middleware: [middleware])
+			oldCompleted.start()
+			oldCompleted.finish()
+
+			try database.write { db in
+				try db.execute(
+					sql: "UPDATE spans SET started_at = 899 WHERE id IN (?, ?)",
+					arguments: [oldParent.id.rawValue.uuidString, oldCompleted.id.rawValue.uuidString]
+				)
+				try db.execute(
+					sql: "UPDATE spans SET started_at = 900 WHERE id = ?",
+					arguments: [boundary.id.rawValue.uuidString]
+				)
+			}
+
+			let reopenedDatabase = try databaseQueue(at: url)
+			_ = try SQLiteSpanMiddleware(reopenedDatabase, retentionPeriod: 100)
+			#expect(try row(for: oldParent, in: reopenedDatabase) == nil)
+			#expect(try row(for: oldCompleted, in: reopenedDatabase) == nil)
+			#expect(try row(for: boundary, in: reopenedDatabase)?["status"] == "finished")
+			let childRow = try row(for: recentChild, in: reopenedDatabase)
+			#expect(childRow?["status"] == "failed")
+			#expect(childRow?["parent_id"] as String? == nil)
 		}
 	}
 

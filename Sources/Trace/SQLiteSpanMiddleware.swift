@@ -1,3 +1,4 @@
+import Dependencies
 import Foundation
 import GRDB
 import IssueReporting
@@ -11,18 +12,20 @@ public struct SQLiteSpanMiddleware: SpanMiddleware {
 
 	public let database: DatabaseQueue
 
-	public init(databaseURL: URL = Self.defaultDatabaseURL) throws {
+	public init(databaseURL: URL = Self.defaultDatabaseURL, retentionPeriod: TimeInterval = 7 * 24 * 60 * 60) throws {
 		try FileManager.default.createDirectory(
 			at: databaseURL.deletingLastPathComponent(),
 			withIntermediateDirectories: true
 		)
 		let database = try DatabaseQueue(path: databaseURL.path)
 
-		try self.init(database)
+		try self.init(database, retentionPeriod: retentionPeriod)
 	}
 
-	public init(_ database: DatabaseQueue) throws {
+	public init(_ database: DatabaseQueue, retentionPeriod: TimeInterval = 7 * 24 * 60 * 60) throws {
 		self.database = database
+		@Dependency(\.date) var date
+		let retentionCutoff = date.now.timeIntervalSince1970 - retentionPeriod
 
 		var migrator = DatabaseMigrator()
 		migrator.registerMigration("createSpans") { db in
@@ -57,8 +60,13 @@ public struct SQLiteSpanMiddleware: SpanMiddleware {
 					try db.execute(
 						sql: "UPDATE spans SET status = 'failed', error = 'Interrupted before completion' WHERE status = 'started'"
 					)
+					try db.execute(
+						sql: "UPDATE spans SET parent_id = NULL WHERE parent_id IN (SELECT id FROM spans WHERE started_at < ?)",
+						arguments: [retentionCutoff]
+					)
+					try db.execute(sql: "DELETE FROM spans WHERE started_at < ?", arguments: [retentionCutoff])
 				} catch {
-					reportIssue("Failed to recover unfinished spans in SQLite: \(error)")
+					reportIssue("Failed to clean up SQLite spans: \(error)")
 				}
 			case let .failure(error):
 				reportIssue("Failed to migrate SQLite spans database: \(error)")
