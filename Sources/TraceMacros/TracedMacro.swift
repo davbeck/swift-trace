@@ -134,7 +134,7 @@ private func attributeDictionary(for parameters: FunctionParameterListSyntax) ->
 		guard expression != "_" else { return nil }
 
 		let key = expression.trimmingCharacters(in: CharacterSet(charactersIn: "`"))
-		return "\(stringLiteral(key)): \(expression) as Any"
+		return "\(stringLiteral(key)): \(expression)"
 	}
 
 	return elements.isEmpty ? "[:]" : "[\(elements.joined(separator: ", "))]"

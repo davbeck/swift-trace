@@ -22,7 +22,7 @@
 						return try await Trace.withSpan(
 							operation: "load",
 							context: "Feature",
-							attributes: ["id": id as Any, "name": name as Any],
+							attributes: ["id": id, "name": name],
 						) { _ in
 							try await fetch(id, name)
 						}
@@ -73,7 +73,7 @@
 						return Trace.withSpan(
 							operation: "load",
 							context: "FeatureContext",
-							attributes: ["id": id as Any],
+							attributes: ["id": id],
 						) { _ in
 							print(id)
 						}
@@ -101,7 +101,7 @@
 						return Trace.withSpan(
 							operation: "load",
 							context: "ExplicitContext",
-							attributes: ["id": id as Any],
+							attributes: ["id": id],
 						) { _ in
 							print(id)
 						}
